@@ -1,0 +1,83 @@
+---
+- name: Configure Admin User Account
+  user:
+    name: "{{ ops_user }}"
+    groups: wheel
+    append: yes
+    shell: /bin/bash
+    create_home: yes
+
+- name: Deploy Required Exam Packages
+  dnf:
+    name: "{{ sys_packages }}"
+    state: present
+
+- name: Initialize Performance Profile
+  file:
+    path: "/etc/tuned/{{ tuned_profile }}"
+    state: directory
+    mode: '0755'
+
+- name: Apply Performance Tuning
+  template:
+    src: tuned.conf.j2
+    dest: "/etc/tuned/{{ tuned_profile }}/tuned.conf"
+    mode: '0644'
+  notify: Restart Tuned
+
+- name: Open Firewall Ports (HTTP)
+  firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+  notify: Reload Firewalld
+
+- name: Prepare Backup Storage Backend
+  block:
+    - name: Create backing file
+      command: truncate -s 512M /var/lib/backup.img
+      args:
+        creates: /var/lib/backup.img
+    - name: Format XFS
+      filesystem:
+        fstype: xfs
+        dev: /var/lib/backup.img
+  rescue:
+    - name: Force Format
+      filesystem:
+        fstype: xfs
+        dev: /var/lib/backup.img
+        force: yes
+
+- name: Configure Mount Point Service
+  template:
+    src: backup.mount.j2
+    dest: /etc/systemd/system/opt-backup.mount
+    mode: '0644'
+  notify: Reload Systemd
+
+- name: Activate Backup Storage
+  systemd:
+    name: opt-backup.mount
+    state: started
+    enabled: yes
+
+- name: Install Backup Logic
+  template:
+    src: backup.service.j2
+    dest: /etc/systemd/system/backup-job.service
+    mode: '0644'
+  notify: Reload Systemd
+
+- name: Configure Backup Rotation Timer
+  template:
+    src: backup.timer.j2
+    dest: /etc/systemd/system/backup-job.timer
+    mode: '0644'
+  notify: Restart Timer
+
+- name: Start Backup Automation
+  systemd:
+    name: backup-job.timer
+    state: started
+    enabled: yes

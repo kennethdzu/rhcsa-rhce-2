@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Runtime: pciconf -lv | grep -A1 -B3 network
+# Runtime: kldload if_alc (Example for alc driver)
+
+# permanent (/boot/loader.conf)
+cat <<EOF >> /boot/loader.conf
+if_alc_load="YES"
+EOF

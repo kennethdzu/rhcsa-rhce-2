@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# permanent (/etc/rc.conf)
+
+# Runtime: hostname freebsd-lab.example.com
+sysrc hostname="freebsd-lab.example.com"
+
+# Runtime: ifconfig em0 inet 192.168.1.50 netmask 255.255.255.0 metric 10
+# Runtime: ifconfig em0 up
+sysrc ifconfig_em0="inet 192.168.1.50 netmask 255.255.255.0 metric 10"
+
+# Runtime: ifconfig em0 inet6 2001:db8::1/64 alias
+sysrc ifconfig_em0_alias0="inet6 2001:db8::1 prefixlen 64"
+
+# Runtime: route add default 192.168.1.1
+sysrc defaultrouter="192.168.1.1"
+
+# Runtime: route -6 add default 2001:db8::1
+sysrc ipv6_defaultrouter="2001:db8::1"
+
+# Runtime: route add -net 10.0.0.0/24 192.168.1.2
+# note: example for a specific static route if needed
+# static_routes="internal"
+# route_internal="-net 10.0.0.0/24 192.168.1.2"
+
+# Runtime: sysctl net.inet6.ip6.v6only=0
+sysrc ipv6_ipv4mapping="YES"
+
+# dns & resolution (static)
+# Runtime: echo "nameserver 8.8.8.8" > /etc/resolv.conf
+cat <<EOF > /etc/resolv.conf
+nameserver 8.8.8.8
+search example.com
+EOF

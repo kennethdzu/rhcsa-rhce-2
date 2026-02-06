@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# permanent (/etc/rc.conf)
+
+# Runtime: ifconfig wlan0 create wlandev iwm0
+sysrc wlans_iwm0="wlan0"
+
+# Runtime: ifconfig wlan0 regdomain etsi2 country AT
+sysrc create_args_wlan0="country AT regdomain etsi2"
+
+# Runtime: wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
+# Runtime: dhclient wlan0 (Automatically runs 'route add default' via DHCP)
+sysrc ifconfig_wlan0="WPA DHCP"
+
+# Runtime: dhclient -b wlan0
+sysrc background_dhclient="YES"
+
+# credential generation
+# setup: wpa_passphrase "MySSID" "MyPassword" > /etc/wpa_supplicant.conf
+
+# credential config (/etc/wpa_supplicant.conf)
+cat <<EOF > /etc/wpa_supplicant.conf
+ctrl_interface=/var/run/wpa_supplicant
+eapol_version=1
+ap_scan=1
+fast_reauth=1
+ssid_scan=1
+network={
+    ssid="MySSID"
+    psk="MyPassword"
+}
+EOF

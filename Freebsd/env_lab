@@ -1,0 +1,99 @@
+#!/bin/sh
+
+# PROVIDE: env_lab
+# REQUIRE: DAEMON
+
+. /etc/rc.subr
+
+name="env_lab"
+rcvar="env_lab_enable"
+
+# defaults
+: ${env_lab_enable:="NO"}
+: ${env_lab_log:="/var/log/env_lab.log"}
+: ${env_lab_conf:="/usr/local/etc/env_lab.conf"}
+
+# infrastructure
+command="/usr/sbin/daemon"
+pidfile="/var/run/${name}.pid"
+
+# allowed commands
+extra_commands="setup audit"
+setup_cmd="lab_setup"
+audit_cmd="lab_audit"
+
+# config loader
+lab_load_config() {
+    if [ -f "${env_lab_conf}" ]; then
+        echo "Loading config..."
+        
+        while read -r line; do
+            case "$line" in
+                \#*|'') continue ;; # skip comments/empty
+                *)
+                    local key="${line%%=*}"
+                    local val="${line#*=}"
+                    # inject into environment
+                    eval "export ${key}='${val}'"
+                    ;;
+            esac
+        done < "${env_lab_conf}"
+    fi
+}
+
+# main loop
+lab_worker() {
+    local count=0
+    trap 'exit 0' 15
+
+    while :; do
+        count=$((count + 1))
+        # existential variable check
+        local current_mode="${APP_MODE:-UNSET}"
+        echo "Tick ${count} | Mode: ${current_mode} | LogLevel: ${APP_LOG_LEVEL:-0}" >> "${env_lab_log}"
+        sleep 10
+    done
+}
+
+# generate config
+lab_setup() {
+    echo "Creating dummy config..."
+    cat <<-'EOF' > "${env_lab_conf}"
+	# Env Lab Configuration
+	APP_MODE=PRODUCTION
+	APP_LOG_LEVEL=DEBUG
+	APP_OWNER=admin
+	EOF
+    chmod 600 "${env_lab_conf}"
+}
+
+# audit logic
+lab_audit() {
+    echo "--- Auditing Environment ---"
+    # modified in last 60 mins
+    local log=$(find /var/log -type f -name "env_lab.log" -mmin -60)
+    
+    if [ -n "$log" ]; then
+        # grep -> sed -> awk filter
+        grep "Mode:" "$log" | \
+        sed 's/.*| Mode/Mode/g' | \
+        awk -F'|' '$1 ~ /PRODUCTION/ { print "HEALTHY: " $1 }' | \
+        tail -n 3
+    else
+        echo "No recent logs found."
+    fi
+}
+
+# run
+# Load config BEFORE daemonizing
+lab_load_config
+
+command_args="-f -P ${pidfile} -r /bin/sh -f $0 internal_start"
+
+if [ "$1" = "internal_start" ]; then
+    lab_worker
+    exit 0
+fi
+
+load_rc_config $name
+run_rc_command "$1"

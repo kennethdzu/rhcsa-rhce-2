@@ -1,0 +1,19 @@
+---
+- name: Reload Systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Reload Firewalld
+  service:
+    name: firewalld
+    state: reloaded
+
+- name: Restart Tuned
+  service:
+    name: tuned
+    state: restarted
+
+- name: Restart Timer
+  service:
+    name: backup-job.timer
+    state: restarted

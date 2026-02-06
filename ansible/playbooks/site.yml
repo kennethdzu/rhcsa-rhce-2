@@ -1,0 +1,6 @@
+---
+- name: RHCE Exam Environment Setup
+  hosts: lab
+  become: true
+  roles:
+    - system_core

@@ -1,0 +1,122 @@
+#!/bin/sh
+
+# variables
+JAIL_ROOT="/usr/local/jails"
+MEDIA_DIR="${JAIL_ROOT}/media"
+TEMPLATE_DIR="${JAIL_ROOT}/templates"
+CONTAINER_DIR="${JAIL_ROOT}/containers"
+RELEASE="15.0-RELEASE"
+DIST_URL="https://download.freebsd.org/ftp/releases/amd64/amd64/${RELEASE}/base.txz"
+
+# infrastructure
+echo "Setting up Jail Infrastructure..."
+mkdir -p "${MEDIA_DIR}" "${TEMPLATE_DIR}" "${CONTAINER_DIR}"
+
+# pull userland
+if [ ! -f "${MEDIA_DIR}/${RELEASE}-base.txz" ]; then
+    echo "Fetching Base System..."
+    curl "${DIST_URL}" -o "${MEDIA_DIR}/${RELEASE}-base.txz"
+fi
+
+# thick jails
+echo "Provisioning Thick Jail..."
+# dedicated dataset
+zfs create -p zroot/jails/containers/thickjail
+
+# full userland
+tar -xf "${MEDIA_DIR}/${RELEASE}-base.txz" \
+    -C "${CONTAINER_DIR}/thickjail" --unlink
+
+# host networking
+cp /etc/resolv.conf "${CONTAINER_DIR}/thickjail/etc/resolv.conf"
+cp /etc/localtime "${CONTAINER_DIR}/thickjail/etc/localtime"
+
+# jail config
+cat << 'EOF' > /etc/jail.conf.d/thickjail.conf
+thickjail {
+  path = "/usr/local/jails/containers/thickjail";
+  host.hostname = "thickjail.local";
+  ip4.addr = 192.168.1.151;
+  interface = em0;
+  exec.start = "/bin/sh /etc/rc";
+  exec.stop = "/bin/sh /etc/rc.shutdown";
+  exec.clean;
+  mount.devfs;
+  allow.raw_sockets;
+}
+EOF
+
+# thin jails (zfs)
+echo "Provisioning Thin Jail (ZFS)..."
+# gold image dataset
+zfs create -p "zroot/jails/templates/${RELEASE}"
+
+# populate template
+tar -xf "${MEDIA_DIR}/${RELEASE}-base.txz" \
+    -C "${TEMPLATE_DIR}/${RELEASE}" --unlink
+
+# the gold state
+zfs snapshot "zroot/jails/templates/${RELEASE}@base"
+
+# instant instantiation
+zfs clone "zroot/jails/templates/${RELEASE}@base" zroot/jails/containers/thinzfs
+
+# thin config
+cat << 'EOF' > /etc/jail.conf.d/thinzfs.conf
+thinzfs {
+  path = "/usr/local/jails/containers/thinzfs";
+  host.hostname = "thinzfs.local";
+  ip4.addr = 192.168.1.152;
+  interface = em0;
+  exec.start = "/bin/sh /etc/rc";
+  exec.stop = "/bin/sh /etc/rc.shutdown";
+  exec.clean;
+  mount.devfs;
+  allow.raw_sockets;
+}
+EOF
+
+# thin jails (nullfs)
+echo "Provisioning Thin Jail (NullFS)..."
+BASE_PATH="${TEMPLATE_DIR}/${RELEASE}-base"
+SKELETON_PATH="${CONTAINER_DIR}/thinufs-skeleton"
+ROOT_PATH="${JAIL_ROOT}/thinufs-root"
+
+mkdir -p "${BASE_PATH}" "${SKELETON_PATH}" "${ROOT_PATH}"
+
+# read-only base
+tar -xf "${MEDIA_DIR}/${RELEASE}-base.txz" \
+    -C "${BASE_PATH}" --unlink
+
+# move writable dirs to skeleton
+mv "${BASE_PATH}/etc" "${SKELETON_PATH}/"
+mv "${BASE_PATH}/root" "${SKELETON_PATH}/"
+mv "${BASE_PATH}/var" "${SKELETON_PATH}/"
+
+# create symlinks in base
+mkdir -p "${BASE_PATH}/skeleton"
+ln -s skeleton/etc "${BASE_PATH}/etc"
+ln -s skeleton/root "${BASE_PATH}/root"
+ln -s skeleton/var "${BASE_PATH}/var"
+
+# the merger (union)
+cat << EOF > "${JAIL_ROOT}/thinufs-root.fstab"
+${BASE_PATH} ${ROOT_PATH} nullfs ro 0 0
+${SKELETON_PATH} ${ROOT_PATH}/skeleton nullfs rw 0 0
+EOF
+
+# nullfs config
+cat << 'EOF' > /etc/jail.conf.d/thinufs.conf
+thinufs {
+  path = "/usr/local/jails/thinufs-root";
+  mount.fstab = "/usr/local/jails/thinufs-root.fstab";
+  host.hostname = "thinufs.local";
+  ip4.addr = 192.168.1.153;
+  interface = em0;
+  exec.start = "/bin/sh /etc/rc";
+  exec.stop = "/bin/sh /etc/rc.shutdown";
+  exec.clean;
+  mount.devfs;
+  allow.raw_sockets;
+}
+EOF

@@ -1,0 +1,9 @@
+backup_path: "/opt/backup"
+backup_schedule: "*-*-* 02:00:00"
+tuned_profile: "exam-profile"
+ops_user: "ops_admin"
+sys_packages:
+  - tmux
+  - vim
+  - bash-completion
+  - firewalld

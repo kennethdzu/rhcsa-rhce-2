@@ -1,0 +1,100 @@
+#!/bin/sh
+
+# PROVIDE: logic_lab
+# REQUIRE: DAEMON
+
+. /etc/rc.subr
+
+name="logic_lab"
+rcvar="logic_lab_enable"
+
+# configuration
+: ${logic_lab_enable:="NO"}
+: ${logic_lab_log:="/var/log/logic_lab.log"}
+
+# infrastructure
+command="/usr/sbin/daemon"
+pidfile="/var/run/${name}.pid"
+
+# extra commands
+extra_commands="parse audit cleanup"
+parse_cmd="lab_parse"
+audit_cmd="lab_audit"
+cleanup_cmd="lab_cleanup"
+
+# main loop
+lab_worker() {
+    local count=0
+    readonly START_TIME=$(date)
+
+    # log clean exit on term/int
+    trap 'echo "Terminated after ${count} ticks"; exit 0' 15 2
+
+    while :; do
+        count=$((count + 1))
+        # tag to syslog
+        echo "Tick ${count} | Started: ${START_TIME}" | logger -t "${name}"
+        # append to file
+        echo "$(date) - Tick ${count} - Status: Active" >> "${logic_lab_log}"
+        sleep 10
+    done
+}
+
+# parsing logic
+lab_parse() {
+    local raw_data="root:deploy|admin:audit|guest:view"
+    local count=0
+    
+    echo "Parsing config..."
+    local OLD_IFS="$IFS"
+    
+    # pipe delimiter
+    IFS='|'
+    set -- $raw_data
+    
+    # positional parameters
+    for item in "$@"; do
+        count=$((count + 1))
+        
+        # pipe into read
+        echo "$item" | IFS=':' read -r user role
+        
+        # eval magic
+        eval "USER_${count}_ROLE='${role}'"
+        eval "echo \"Parsed: User \${user} -> \$USER_${count}_ROLE\""
+    done
+    
+    IFS="$OLD_IFS"
+}
+
+# audit logic
+lab_audit() {
+    echo "--- Auditing Log ---"
+    local target=$(find /var/log -type f -name "logic_lab.log")
+    
+    if [ -n "$target" ]; then
+        # grep -> sed -> awk
+        grep "Tick" "$target" | \
+        sed 's/Status: Active/[RUNNING]/g' | \
+        awk '{print "Time: " $4 " | State: " $7}' | \
+        tail -n 3
+    else
+        echo "Log not found."
+    fi
+}
+
+lab_cleanup() {
+    echo "Flushing logs..."
+    : > "${logic_lab_log}"
+}
+
+# execute
+command_args="-f -P ${pidfile} -r /bin/sh -f $0 internal_start"
+
+if [ "$1" = "internal_start" ]; then
+    lab_worker
+    exit 0
+fi
+
+load_rc_config $name
+run_rc_command "$1"

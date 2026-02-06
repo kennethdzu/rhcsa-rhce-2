@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# permanent (/etc/rc.conf)
+
+# client role
+# Runtime: ifconfig em0 inet6 accept_rtadv
+sysrc ifconfig_em0_ipv6="inet6 accept_rtadv"
+
+# Runtime: rtsol em0 (Solicits a route/prefix from local routers)
+sysrc rtsold_enable="YES"
+
+# router role
+# Runtime: sysctl net.inet6.ip6.forwarding=1
+sysrc ipv6_gateway_enable="YES"
+
+# Runtime: service rtadvd start
+sysrc rtadvd_enable="YES"
+sysrc rtadvd_interfaces="em0"
+
+sysrc local_unbound_enable="YES"
+
+# Runtime: ifconfig em0 inet6 2001:db8::a anycast alias
+sysrc ifconfig_em0_alias0="inet6 2001:db8::a anycast"
+
+# router advertisement (/etc/rtadvd.conf)
+cat <<EOF > /etc/rtadvd.conf
+em0:\\
+   :addrs#1:addr="2001:db8:1f11:246::":prefixlen#64:tc=ether:
+EOF
