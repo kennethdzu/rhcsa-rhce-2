@@ -1,16 +1,14 @@
-# Ops Final: Systems Engineering
+# Ops Final: Advanced Infrastructure Automation
 
-This repository holds the clean, production-ready implementation of the infrastructure, along with some Personal labs I did in FreeBSD. The main goal was to build a solid, RHCE-level solution for the cloud environment, but I also used this workspace to practice lower-level systems concepts.
+This repository holds a production-ready implementation of a cloud infrastructure and configuration management pipeline. The primary goal was to build a robust, RHCE-level solution for automated environments on AWS.
+
+I also included a set of personal FreeBSD labs where I practice lower-level systems concepts to improve my general shell logic.
 
 ## Project Structure
-The project is split into the main automation tools and my systems programming labs.
+The project is split into the main automation tools and my practice labs.
 
 ```text
 .
-├── Freebsd/                 # Systems Engineering Labs
-│   ├── jails_setup          # Virtualization Automation
-│   ├── net_*                # Modular Networking Drivers
-│   └── *_lab                # Logic & Environment Auditing
 ├── ansible/                 # Configuration Automation
 │   ├── ansible.cfg          # Environment Configuration
 │   ├── playbooks/           # State Enforcement
@@ -20,11 +18,15 @@ The project is split into the main automation tools and my systems programming l
 │   └── modules/             # Resource Abstraction
 │       ├── compute/         # Instance Provisioning
 │       └── networking/      # Network Architecture
+├── Freebsd/                 # Practice Labs
+│   ├── jails_setup          # Virtualization Practice
+│   ├── net_*                # Networking Practice
+│   └── *_lab                # Logic & Auditing
 └── README.md                # Technical Documentation
 ```
 
 ## Cloud Infrastructure (Terraform)
-This is the modular Terraform setup that provisions my RHEL 10 environment on AWS (`af-south-1`). It's clean and straightforward.
+This is the modular Terraform setup that provisions my RHEL 10 environment on AWS (`af-south-1`). It focuses on a clean, maintainable code structure.
 
 *   **Network**: A custom VPC (`10.0.0.0/16`) to isolate my resources.
 *   **Compute**: I use `t3.micro` instances with a specific RHEL 10 AMI.
@@ -38,13 +40,8 @@ I use Ansible to ensure the server is configured exactly how I want it, every ti
 *   **Storage**: Sets up a 512MB loopback device mounted at `/opt/backup` for storage practice.
 *   **Tuning**: Applies a system profile to optimize performance.
 
-## FreeBSD Labs & Shell Logic
-The `Freebsd/` directory is where I spent time really getting comfortable with systems logic.
+## Appendix: FreeBSD Practice Labs
+The `Freebsd/` directory is where I practice manual systems logic. It's not part of the production pipeline, but it helps me sharpen my understanding of signal trapping and process management.
 
-I specifically worked with the FreeBSD `rc.d` system here because it forces you to handle things like signal trapping, process management, and environment parsing manually. It was great practice that really improved my understanding of Bash scripting in general.
-
-*   **Virtualization (Jails)**: I wrote `jails_setup` to automate creating different types of environments—Thick jails, Thin ZFS-backed jails, and NullFS workspaces.
-*   **Networking**: I wrote modular scripts (`net_*`) to handle things like static IPs, Wi-Fi connections, and IPv6 router advertisements manually.
-*   **Logic Scripts**:
-    *   `logic_lab`: This was a playground for handling daemon logic and signal trapping (like catching SIGINT).
-    *   `env_lab`: A script to audit and inject environment variables at runtime.
+*   **Service Scripts (`logic_lab`, `env_lab`)**: These are fully compliant `rc.d` scripts. I wrote them to understand how daemons, PID files, and signal traps (`SIGINT`, `SIGTERM`) work under the hood.
+*   **Practice Scripts (`jails_setup`, `net_*`)**: These are just for practice. I wrote them to get familiar with manually configuring jails and networking (like static IPs and `wpa_supplicant`) without relying on automation tools.
